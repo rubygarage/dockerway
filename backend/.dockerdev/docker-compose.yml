@@ -1,0 +1,77 @@
+version: '3.4'
+
+x-app: &app
+  build:
+    context: ../
+    dockerfile: .dockerdev/Dockerfile
+    args:
+      BUNDLER_VERSION: '2.0.2'
+  image: backend-dev:1.0.0
+  tmpfs:
+    - /tmp
+
+x-backend: &backend
+  <<: *app
+  stdin_open: true
+  tty: true
+  volumes:
+    - ../:/home/www/backend:cached
+    - rails_cache:/home/www/backend/tmp/cache
+    - bundle:/bundle
+    - node_modules:/home/www/backend/node_modules
+    - packs:/home/www/backend/public/packs
+    - .psqlrc:/root/.psqlrc:ro
+  environment:
+    - NODE_ENV=development
+    - RAILS_ENV=${RAILS_ENV:-development}
+    - REDIS_URL=redis://redis:6379/
+    - BOOTSNAP_CACHE_DIR=/bundle/bootsnap
+    - WEB_CONCURRENCY=1
+    - HISTFILE=/home/www/backend/log/.bash_history
+    - PSQL_HISTFILE=/home/www/backend/log/.psql_history
+    - PG_HOST=postgres
+    - PG_PASSWORD=postgres
+    - PG_USER=postgres
+  depends_on:
+    - postgres
+    - redis
+
+services:
+  runner:
+    <<: *backend
+    command: /bin/bash
+    ports:
+      - '3000:3000'
+      - '3002:3002'
+
+  rails:
+    <<: *backend
+    command: bundle exec rails server -b 0.0.0.0
+    entrypoint: './.dockerdev/entrypoint.sh'
+    ports:
+      - '3000:3000'
+  sidekiq:
+    <<: *backend
+    command: bundle exec sidekiq -C config/sidekiq.yml
+
+  postgres:
+    image: postgres:11.1
+    volumes:
+      - .psqlrc:/root/.psqlrc:ro
+      - postgres:/var/lib/postgresql/data
+      - ../log:/root/log:cached
+    environment:
+      - PSQL_HISTFILE=/root/log/.psql_history
+
+  redis:
+    image: redis:3.2-alpine
+    volumes:
+      - redis:/data
+
+volumes:
+  postgres:
+  redis:
+  bundle:
+  node_modules:
+  rails_cache:
+  packs:

@@ -1,0 +1,61 @@
+version: '2'
+
+environment:
+  RAILS_ENV: development
+
+compose:
+  files:
+    - ./.dockerdev/docker-compose.yml
+  project_name: backend
+
+interaction:
+  bash:
+    service: runner
+    command: /bin/bash
+    compose_run_options: [no-deps]
+
+  bundle:
+    service: runner
+    command: bundle
+    compose_run_options: [no-deps]
+
+  rake:
+    service: runner
+    command: bundle exec rake
+
+  rails:
+    service: runner
+    command: bundle exec rails
+    subcommands:
+      s:
+        service: rails
+        compose_run_options: [service-ports]
+
+  yarn:
+    service: runner
+    command: yarn
+    compose_run_options: [no-deps]
+
+  rspec:
+    service: runner
+    environment:
+      RAILS_ENV: test
+    command: bundle exec rspec
+
+  rubocop:
+    service: runner
+    command: bundle exec rubocop
+    compose_run_options: [no-deps]
+
+  psql:
+    service: postgres
+    command: psql -h postgres -U postgres -d example_app_dev
+
+  'redis-cli':
+    service: redis
+    command: redis-cli -h redis
+
+provision:
+  - dip compose down --volumes
+  - dip compose up -d postgres redis
+  - dip bash -c ./bin/setup

@@ -1,0 +1,21 @@
+version: '2'
+
+compose:
+  files:
+    - ./.dockerdev/docker-compose.yml
+  project_name: frontend
+
+interaction:
+  yarn:
+    service: nextjs
+    command: yarn
+    subcommands:
+      dev:
+        command: yarn dev
+        compose_run_options: [service-ports]
+      install:
+        command: yarn install
+
+provision:
+  - dip compose down --volumes
+  - dip yarn install

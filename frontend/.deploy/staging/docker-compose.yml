@@ -1,0 +1,44 @@
+version: '3'
+
+volumes:
+  static:
+
+services:
+  nginx:
+    image: "${AWS_ACCOUNT_NUMBER}.dkr.ecr.${REGION}.amazonaws.com/frontend/nginx:${TAG}"
+    build: ../lib/nginx
+    ports:
+      - 80:8080
+    links:
+      - nextjs
+    volumes:
+      - static:/home/www/frontend/static
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: frontend-staging
+        awslogs-region: ${REGION}
+        awslogs-stream-prefix: nginx
+    healthcheck:
+      test: ["CMD-SHELL", "service nginx status || exit 1"]
+
+  nextjs:
+    image: "${AWS_ACCOUNT_NUMBER}.dkr.ecr.${REGION}.amazonaws.com/frontend/nextjs:${TAG}"
+    build:
+      context: ../../.
+      dockerfile: .deploy/lib/Dockerfile
+      args:
+        API_HOST: https://stagingapi.backend.com
+        NODE_ENV: staging
+    ports:
+      - 4000
+    volumes:
+      - static:/home/www/frontend/static
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: frontend-staging
+        awslogs-region: ${REGION}
+        awslogs-stream-prefix: nextjs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/"]

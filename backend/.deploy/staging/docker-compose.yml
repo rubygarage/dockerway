@@ -1,0 +1,95 @@
+version: '3'
+
+services:
+  nginx:
+    image: "${AWS_ACCOUNT_NUMBER}.dkr.ecr.${REGION}.amazonaws.com/backend/nginx:${TAG}"
+    build: ../lib/nginx
+    ports:
+      - 80:8080
+    links:
+      - rails
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: backend-staging
+        awslogs-region: ${REGION}
+        awslogs-stream-prefix: nginx
+    healthcheck:
+      test: ["CMD-SHELL", "service nginx status || exit 1"]
+
+  rails: &rails
+    image: "${AWS_ACCOUNT_NUMBER}.dkr.ecr.${REGION}.amazonaws.com/backend/rails:${TAG}"
+    build:
+      context: ../../.
+      dockerfile: .deploy/lib/Dockerfile
+      args:
+        BUNDLE_WITHOUT: development test
+        RAILS_ENV: staging
+    command: bundle exec puma -C config/puma.rb
+    entrypoint: "./.deploy/lib/entrypoint.sh"
+    ports:
+      - 8000
+    environment: &rails_env
+      RAILS_ENV: staging
+      PORT: 8000
+      RAILS_MAX_THREADS: 25
+      REDIS_URL: redis://redis:6379
+      PG_HOST: postgres
+      PG_PASSWORD: postgres
+      PG_USER: postgres
+      RAILS_LOG_TO_STDOUT: "true"
+    links:
+      - postgres
+      - redis
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: backend-staging
+        awslogs-region: ${REGION}
+        awslogs-stream-prefix: rails
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+
+  sidekiq:
+    <<: *rails
+    command: bundle exec sidekiq
+    entrypoint: ""
+    environment:
+      <<: *rails_env
+      PORT: 8001
+    ports:
+      - 8001
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: backend-staging
+        awslogs-region: ${REGION}
+        awslogs-stream-prefix: sidekiq
+    healthcheck:
+      test: ["CMD-SHELL", "ps ax | grep -v grep | grep sidekiq || exit 1"]
+
+  postgres:
+    image: postgres:11
+    volumes:
+      - /postgres:/var/lib/postgresql/data
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: backend-staging
+        awslogs-region: ${REGION}
+        awslogs-stream-prefix: postgres
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+
+  redis:
+    image: redis:4.0
+    volumes:
+      - /redis:/var/lib/redis/data
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: backend-staging
+        awslogs-region: ${REGION}
+        awslogs-stream-prefix: redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "-h", "localhost", "ping"]

@@ -1,0 +1,19 @@
+version: 1
+task_definition:
+  ecs_network_mode: bridge
+
+  task_size:
+    cpu_limit: 900
+    mem_limit: 900
+
+  services:
+    nginx:
+      essential: true
+    rails:
+      essential: true
+    sidekiq:
+      essential: true
+    postgres:
+      essential: true
+    redis:
+      essential: true

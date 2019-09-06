@@ -1,0 +1,13 @@
+version: 1
+task_definition:
+  ecs_network_mode: bridge
+
+  task_size:
+    cpu_limit: 800
+    mem_limit: 700
+
+  services:
+    nginx:
+      essential: true
+    nextjs:
+      essential: true
